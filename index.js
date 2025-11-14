@@ -8,23 +8,29 @@ const app = express();
 
 app.use(cors());
 
-// mediaGateway ENVIA "audio", então MULTER tem que esperar "audio"
-const upload = multer({ dest: "uploads/" }).single("audio");
+// LOG para descobrir o nome real do campo vindo do mediaGateway
+app.use((req, res, next) => {
+  console.log("📩 HEADERS:", req.headers);
+  next();
+});
+
+// Aceita QUALQUER campo de arquivo
+const upload = multer({ dest: "uploads/" }).any();
 
 // -----------------------------
 // ROTA /convert
 // -----------------------------
 app.post("/convert", upload, (req, res) => {
   console.log("=== /convert ===");
-  console.log("req.file:", req.file);
+  console.log("req.body:", req.body);
+  console.log("req.files:", req.files);
 
-  if (!req.file) {
-    return res.status(400).json({
-      error: 'Nenhum arquivo enviado no campo "audio"',
-    });
+  const file = req.files?.[0];
+  if (!file) {
+    return res.status(400).json({ error: "Nenhum arquivo recebido" });
   }
 
-  const inputPath = req.file.path;
+  const inputPath = file.path;
   const outputPath = `${inputPath}.ogg`;
 
   ffmpeg(inputPath)
@@ -41,7 +47,7 @@ app.post("/convert", upload, (req, res) => {
       res.send(fileData);
     })
     .on("error", (err) => {
-      console.error("Erro na conversão:", err);
+      console.error("❌ Erro na conversão:", err);
       res.status(500).json({ error: "Falha na conversão" });
     })
     .run();
@@ -52,15 +58,15 @@ app.post("/convert", upload, (req, res) => {
 // -----------------------------
 app.post("/webhook/waba", upload, (req, res) => {
   console.log("=== /webhook/waba ===");
-  console.log("req.file:", req.file);
+  console.log("req.body:", req.body);
+  console.log("req.files:", req.files);
 
-  if (!req.file) {
-    return res.status(400).json({
-      error: 'Nenhum arquivo enviado no campo "audio"',
-    });
+  const file = req.files?.[0];
+  if (!file) {
+    return res.status(400).json({ error: "Nenhum arquivo recebido" });
   }
 
-  const inputPath = req.file.path;
+  const inputPath = file.path;
   const outputPath = `${inputPath}.ogg`;
 
   ffmpeg(inputPath)
