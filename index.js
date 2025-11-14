@@ -1,89 +1,82 @@
-// -----------------------------
-// server.js - Fly.io (MODO DIAGNÓSTICO)
-// -----------------------------
-
 import express from "express";
 import multer from "multer";
 import cors from "cors";
+import fs from "fs";
+import ffmpeg from "fluent-ffmpeg";
 
 const app = express();
 
 app.use(cors());
 
-// ⚠️ IMPORTANTE: NÃO usar express.json() aqui globalmente.
-// Para rota multipart, o Multer precisa pegar o body cru.
-const upload = multer({ dest: "uploads/" }).any();
+// ⚠️ BASE44 → mediaGateway → Fly.io
+// O mediaGateway envia o arquivo NO CAMPO "file"
+const upload = multer({ dest: "uploads/" }).single("file");
 
-// -----------------------------
-// ROTA DE TESTE
-// -----------------------------
-app.get("/", (req, res) => {
-  res.json({ status: "OK", message: "Diagnóstico de upload ativo" });
-});
-
-// -----------------------------
-// ROTA /convert — SÓ PARA LOGAR O QUE CHEGA
-// -----------------------------
+// -------------------------------------------------
+// ROTA PRINCIPAL USADA PELO mediaGateway
+// -------------------------------------------------
 app.post("/convert", upload, (req, res) => {
-  console.log("==== NOVA REQUISIÇÃO /convert ====");
-  console.log("Content-Type:", req.headers["content-type"]);
+  console.log("=== /convert ===");
+  console.log("req.file:", req.file);
 
-  console.log("Body (req.body):", req.body);
-  console.log("Files (req.files):", req.files);
-
-  if (!req.files || req.files.length === 0) {
-    console.error("❌ Nenhum arquivo chegou em req.files");
-    return res.status(400).json({
-      success: false,
-      message: "Nenhum arquivo encontrado em req.files",
-      body: req.body,
-    });
+  if (!req.file) {
+    return res.status(400).json({ error: "Nenhum arquivo enviado no campo 'file'" });
   }
 
-  const mapped = req.files.map((f) => ({
-    fieldname: f.fieldname,
-    originalname: f.originalname,
-    mimetype: f.mimetype,
-    size: f.size,
-    path: f.path,
-  }));
+  const inputPath = req.file.path;
+  const outputPath = `${inputPath}.ogg`;
 
-  console.log("Arquivos mapeados:", mapped);
-
-  return res.json({
-    success: true,
-    message: "Arquivos recebidos com sucesso em /convert (modo diagnóstico).",
-    files: mapped,
-    body: req.body,
-  });
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .audioCodec("libopus")
+    .format("ogg")
+    .on("end", () => {
+      const fileData = fs.readFileSync(outputPath);
+      fs.unlinkSync(inputPath);
+      fs.unlinkSync(outputPath);
+      res.setHeader("Content-Type", "audio/ogg");
+      res.send(fileData);
+    })
+    .on("error", (err) => {
+      console.error("Erro na conversão:", err);
+      res.status(500).json({ error: "Falha na conversão" });
+    })
+    .run();
 });
 
-// -----------------------------
-// OPCIONAL – WHATSAPP WEBHOOK (MESMO ESQUEMA)
-// -----------------------------
+// -------------------------------------------------
+// WEBHOOK (opcional)
+// -------------------------------------------------
 app.post("/webhook/waba", upload, (req, res) => {
-  console.log("==== NOVA REQUISIÇÃO /webhook/waba ====");
-  console.log("Content-Type:", req.headers["content-type"]);
-  console.log("Body (req.body):", req.body);
-  console.log("Files (req.files):", req.files);
+  if (!req.file) {
+    return res.status(400).json({ error: "Nenhum arquivo enviado no campo 'file'" });
+  }
 
-  const mapped = (req.files || []).map((f) => ({
-    fieldname: f.fieldname,
-    originalname: f.originalname,
-    mimetype: f.mimetype,
-    size: f.size,
-    path: f.path,
-  }));
+  const inputPath = req.file.path;
+  const outputPath = `${inputPath}.ogg`;
 
-  return res.json({
-    success: true,
-    message: "Webhook WABA recebido (modo diagnóstico).",
-    files: mapped,
-    body: req.body,
-  });
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .audioCodec("libopus")
+    .format("ogg")
+    .on("end", () => {
+      const fileData = fs.readFileSync(outputPath);
+      fs.unlinkSync(inputPath);
+      fs.unlinkSync(outputPath);
+      res.setHeader("Content-Type", "audio/ogg");
+      res.send(fileData);
+    })
+    .on("error", (err) => {
+      res.status(500).json({ error: "Falha na conversão" });
+    })
+    .run();
+});
+
+app.get("/", (req, res) => {
+  res.json({ status: "OK", message: "FFmpeg Converter ativo" });
 });
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
-  console.log("🚀 Servidor de diagnóstico rodando na porta " + port);
+  console.log("Servidor rodando na porta " + port);
 });
