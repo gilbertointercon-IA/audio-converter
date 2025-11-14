@@ -8,19 +8,20 @@ const app = express();
 
 app.use(cors());
 
-// ⚠️ BASE44 → mediaGateway → Fly.io
-// O mediaGateway envia o arquivo NO CAMPO "file"
-const upload = multer({ dest: "uploads/" }).single("file");
+// mediaGateway ENVIA "audio", então MULTER tem que esperar "audio"
+const upload = multer({ dest: "uploads/" }).single("audio");
 
-// -------------------------------------------------
-// ROTA PRINCIPAL USADA PELO mediaGateway
-// -------------------------------------------------
+// -----------------------------
+// ROTA /convert
+// -----------------------------
 app.post("/convert", upload, (req, res) => {
   console.log("=== /convert ===");
   console.log("req.file:", req.file);
 
   if (!req.file) {
-    return res.status(400).json({ error: "Nenhum arquivo enviado no campo 'file'" });
+    return res.status(400).json({
+      error: 'Nenhum arquivo enviado no campo "audio"',
+    });
   }
 
   const inputPath = req.file.path;
@@ -32,8 +33,10 @@ app.post("/convert", upload, (req, res) => {
     .format("ogg")
     .on("end", () => {
       const fileData = fs.readFileSync(outputPath);
+
       fs.unlinkSync(inputPath);
       fs.unlinkSync(outputPath);
+
       res.setHeader("Content-Type", "audio/ogg");
       res.send(fileData);
     })
@@ -44,12 +47,17 @@ app.post("/convert", upload, (req, res) => {
     .run();
 });
 
-// -------------------------------------------------
-// WEBHOOK (opcional)
-// -------------------------------------------------
+// -----------------------------
+// ROTA /webhook/waba
+// -----------------------------
 app.post("/webhook/waba", upload, (req, res) => {
+  console.log("=== /webhook/waba ===");
+  console.log("req.file:", req.file);
+
   if (!req.file) {
-    return res.status(400).json({ error: "Nenhum arquivo enviado no campo 'file'" });
+    return res.status(400).json({
+      error: 'Nenhum arquivo enviado no campo "audio"',
+    });
   }
 
   const inputPath = req.file.path;
@@ -61,8 +69,10 @@ app.post("/webhook/waba", upload, (req, res) => {
     .format("ogg")
     .on("end", () => {
       const fileData = fs.readFileSync(outputPath);
+
       fs.unlinkSync(inputPath);
       fs.unlinkSync(outputPath);
+
       res.setHeader("Content-Type", "audio/ogg");
       res.send(fileData);
     })
@@ -78,5 +88,5 @@ app.get("/", (req, res) => {
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
-  console.log("Servidor rodando na porta " + port);
+  console.log("🚀 Servidor rodando na porta " + port);
 });
