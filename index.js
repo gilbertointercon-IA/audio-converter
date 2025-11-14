@@ -1,3 +1,7 @@
+// -----------------------------
+// server.js - Fly.io FFmpeg Converter
+// -----------------------------
+
 import express from "express";
 import multer from "multer";
 import cors from "cors";
@@ -5,18 +9,27 @@ import fs from "fs";
 import ffmpeg from "fluent-ffmpeg";
 
 const app = express();
+
+// ⚠️ IMPORTANTE: NÃO USE express.json() ANTES DO MULTER NAS ROTAS DE UPLOAD
 app.use(cors());
-app.use(express.json());
 
-// ⚠️ Base44 SEMPRE envia o áudio gravado no campo "file"
-const upload = multer({ dest: "uploads/" }).single("file");
+// ---------------------------------------
+// CONFIGURAÇÃO CORRETA DO MULTER
+// mediaGateway envia o arquivo no campo "audio"
+// ---------------------------------------
+const upload = multer({ dest: "uploads/" }).single("audio");
 
-// -----------------------------
-// ROTA QUE O BASE44 USA PARA ÁUDIO GRAVADO
-// -----------------------------
+// ---------------------------------------
+// ROTA PRINCIPAL USADA PELO mediaGateway
+// ---------------------------------------
 app.post("/convert", upload, (req, res) => {
+  console.log("==== NOVA REQUISIÇÃO /convert ====");
+  console.log("Headers:", req.headers["content-type"]);
+  console.log("req.file recebido:", req.file);
+
   if (!req.file) {
-    return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    console.error("❌ Nenhum arquivo recebido no campo 'audio'");
+    return res.status(400).json({ error: "Nenhum arquivo enviado no campo 'audio'" });
   }
 
   const inputPath = req.file.path;
@@ -42,12 +55,12 @@ app.post("/convert", upload, (req, res) => {
     .run();
 });
 
-// -----------------------------
+// ---------------------------------------
 // OPCIONAL – WHATSAPP WEBHOOK
-// -----------------------------
+// ---------------------------------------
 app.post("/webhook/waba", upload, (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    return res.status(400).json({ error: "Nenhum arquivo enviado no campo 'audio'" });
   }
 
   const inputPath = req.file.path;
@@ -73,11 +86,14 @@ app.post("/webhook/waba", upload, (req, res) => {
     .run();
 });
 
+// ---------------------------------------
+// ROTA DE TESTE
+// ---------------------------------------
 app.get("/", (req, res) => {
   res.json({ status: "OK", message: "FFmpeg Converter ativo" });
 });
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
-  console.log("Servidor rodando na porta " + port);
+  console.log("🚀 Servidor rodando na porta " + port);
 });
