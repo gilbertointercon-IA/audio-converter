@@ -3,20 +3,23 @@ import multer from "multer";
 import cors from "cors";
 import fs from "fs";
 import ffmpeg from "fluent-ffmpeg";
-import path from "path";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const upload = multer({ dest: "uploads/" });
+// ACEITA QUALQUER NOME DE CAMPO
+const upload = multer({ dest: "uploads/" }).any();
 
-app.post("/convert", upload.single("file"), (req, res) => {
-  if (!req.file) {
+app.post("/convert", (req, res) => {
+  if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: "Nenhum arquivo enviado" });
   }
 
-  const inputPath = req.file.path;
+  // PEGA O PRIMEIRO ARQUIVO, independentemente do nome do campo
+  const file = req.files[0];
+
+  const inputPath = file.path;
   const outputPath = `${inputPath}.ogg`;
 
   ffmpeg(inputPath)
